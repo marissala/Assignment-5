@@ -1,0 +1,127 @@
+---
+title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
+author: "Riccardo Fusaroli"
+date: "3/7/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Building on the shoulders of giants: meta-analysis
+
+## Questions to be answered
+
+1. What is the current evidence for distinctive patterns of pitch mean and pitch sd in schizophrenia? Report how many papers report quantitative estimates, your method to analyze them, the estimated effect size of the difference (mean effect size and standard error for pitch mean, same for pitch sd) and forest plots representing it. 
+-how many participants
+
+2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
+
+3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+
+## Tips on the process to follow:
+
+- Download the data on all published articles analyzing pitch in schizophrenia: https://www.dropbox.com/s/pmgw8wzc308so1p/Data.csv?dl=0
+- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean and pitch standard deviation.
+ . first try using lmer (to connect to what you know of mixed effects models)
+ . then use rma() (to get some juicy additional statistics)
+
+- Build a forest plot of the results (forest(model))
+ 
+- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
+
+- Now look at the output of rma() and check tau and I2
+```{r}
+pacman::p_load(metafor, plyr, lme4, magrittr,dplyr)
+d = read.csv2("Data.csv", stringsAsFactors = F)
+
+# Fix a typo
+d = plyr::rename(d, c(SampleSizeContros = "SampleSizeControls"))
+
+# Factors to 
+d$PitchMeanControls = as.numeric(d$PitchMeanControls)
+d$PitchMeanControlsSD = as.numeric(d$PitchMeanControlsSD)
+d$PitchMeanSchizo = as.numeric(d$PitchMeanSchizo)
+d$PitchMeanSchizoSD = as.numeric(d$PitchMeanSchizoSD)
+d$PitchSDSchizo = as.numeric(d$PitchSDSchizo)
+d$PitchSDControls = as.numeric(d$PitchSDControls)
+d$PitchSDSchizoSD = as.numeric(d$PitchSDSchizoSD)
+d$PitchSDControlsSD= as.numeric(d$PitchSDControlsSD)
+
+PitchRange = escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeControls, m1i=PitchMeanSchizo, m2i=PitchMeanControls, sd1i=PitchMeanSchizoSD, sd2i=PitchMeanControlsSD, data = d)
+
+PitchSD = escalc('SMD', n1i=SampleSizeSchizo, n2i=SampleSizeControls, m1i=PitchSDSchizo, m2i=PitchSDControls, sd1i=PitchSDSchizoSD, sd2i=PitchSDControlsSD, data = d)
+
+# lmer model
+mM <- lmer(yi ~ 1 + (1 | Article), weights = 1/vi, data=PitchRange, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+summary(mM)
+
+mSD <- lmer(yi ~ 1 + (1 | Article), weights = 1/vi, data=PitchSD, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+summary(mSD)
+
+# RMA
+mM2 = rma(PitchRange$yi, PitchRange$vi, PitchRange, slab = PitchRange$Article)
+mSD2 = rma(PitchSD$yi, PitchSD$vi, PitchSD, slab = PitchSD$Article)
+
+# Plant a forest
+forest(mM2)
+forest(mSD2)
+
+```
+
+```{r}
+# Read in data
+data = read.csv("../Assignment-3/final_rqa.csv")
+
+data$participant = as.factor(data$participant)
+data$study = as.factor(data$study)
+
+# Scale everything
+data <- data %>% dplyr::mutate_each_(funs(scale(.) %>% as.vector), 
+                             vars = c("mean","stdDev","range","median","InterquartileRange","MeanAbsoluteDeviation","coefficientOfVariation","delay","radius","embed","rqa_REC","rqa_DET","rqa_maxL","rqa_L","rqa_ENTR","rqa_TT","rqa_LAM"))
+
+# Run the model for SD
+SD_model = glmer(stdDev ~ diagnosis + (1+diagnosis|participant), data)
+summary(SD_model)
+# And mean
+mean_model = glmer(mean ~ diagnosis + (1+diagnosis|participant), data)
+summary(mean_model)
+
+# Try get the numbers you need
+## Get the yi
+yi_m = fixef(mean_model)[[2]]
+yi_sd = fixef(SD_model)[[2]]
+## Get the vi
+variable = VarCorr(mean_model)
+sigmaVisit <- as.numeric(attr(variable[[1]],"stddev")[2])
+vi_m = sigmaVisit^2
+# And SD
+variable = VarCorr(SD_model)
+sigmaVisit <- as.numeric(attr(variable[[1]],"stddev")[2])
+vi_sd = sigmaVisit^2
+
+# Add these numbers to the PitchRange
+# New row for mean
+mystudy_mean = c("Mystudy mean", 2017, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, yi_m, vi_m)
+PitchRange2 = rbind(PitchRange, mystudy_mean)
+# And for SD
+mystudy_SD = c("Mystudy SD", 2017, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, yi_sd, vi_sd)
+PitchSD2 = rbind(PitchSD, mystudy_SD)
+
+# Factors to numbers
+PitchRange2$yi = as.numeric(PitchRange2$yi)
+PitchRange2$vi = as.numeric(PitchRange2$vi)
+PitchSD2$yi = as.numeric(PitchSD2$yi)
+PitchSD2$vi = as.numeric(PitchSD2$vi)
+
+# RMA again
+mean2 = rma(PitchRange2$yi, PitchRange2$vi, PitchRange2, slab = PitchRange2$Article)
+SD2 = rma(PitchSD2$yi, PitchSD2$vi, PitchSD2, slab = PitchSD2$Article)
+
+# Plant 2 more forests
+forest(mean2)
+forest(SD2)
+
+```
+
