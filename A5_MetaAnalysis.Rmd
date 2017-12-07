@@ -62,7 +62,9 @@ summary(mSD)
 
 # RMA
 mM2 = rma(PitchRange$yi, PitchRange$vi, PitchRange, slab = PitchRange$Article)
+mM2
 mSD2 = rma(PitchSD$yi, PitchSD$vi, PitchSD, slab = PitchSD$Article)
+mSD2
 
 # Plant a forest
 forest(mM2)
@@ -117,11 +119,36 @@ PitchSD2$vi = as.numeric(PitchSD2$vi)
 
 # RMA again
 mean2 = rma(PitchRange2$yi, PitchRange2$vi, PitchRange2, slab = PitchRange2$Article)
+mean2
 SD2 = rma(PitchSD2$yi, PitchSD2$vi, PitchSD2, slab = PitchSD2$Article)
+SD2
 
 # Plant 2 more forests
 forest(mean2)
 forest(SD2)
+
+sum(PitchRange$SampleSizeControls, na.rm=T)
+
+```
+
+3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+```{r}
+# Test for influential studies
+inf = influence(mean2)
+infSD = influence(SD2)
+
+print(inf)
+print(infSD)
+
+plot(inf) #10
+plot(infSD) #9
+
+# Funnel plots
+funnel(mean2, main = "Random-Effects Model",xlab = "Standardized Mean Difference of Pitch Mean")
+regtest(mean2)
+
+funnel(SD2, main = "Random-Effects Model",xlab = "Standardized Mean Difference of Pitch SD")
+regtest(SD2)
 
 ```
 
