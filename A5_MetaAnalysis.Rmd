@@ -146,9 +146,11 @@ plot(infSD) #9
 # Funnel plots
 funnel(mean2, main = "Random-Effects Model",xlab = "Standardized Mean Difference of Pitch Mean")
 regtest(mean2)
+ranktest(mean2)
 
 funnel(SD2, main = "Random-Effects Model",xlab = "Standardized Mean Difference of Pitch SD")
 regtest(SD2)
+ranktest(SD2)
 
 ```
 
